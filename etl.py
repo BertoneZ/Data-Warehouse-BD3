@@ -29,7 +29,7 @@ if not df_sitio_web.empty:
         'url_sitio': 'url_sitio_web'
     })
     df_sitio_web.to_sql('dim_sitio_web', engine, schema='data_warehouse', if_exists='append', index=False)
-    print(f"¡Éxito! Se cargaron {len(df_sitio_web)} sitios web nuevos.")
+    print(f"Dim_Sitio_Web: {len(df_sitio_web)} sitios web nuevos.")
 else:
     print("Dim_Sitio_Web: No hay datos nuevos para cargar.")
 
@@ -72,7 +72,7 @@ except Exception:
 
 df_emplazamiento = pd.read_sql(f"SELECT id_emplazamiento, url_emplazamiento FROM operacional.emplazamiento WHERE id_emplazamiento > {max_id_emp};", engine)
 if not df_emplazamiento.empty:
-    # No necesita rename porque los nombres son idénticos
+   
     df_emplazamiento.to_sql('dim_emplazamiento', engine, schema='data_warehouse', if_exists='append', index=False)
     print(f"Dim_Emplazamiento: {len(df_emplazamiento)} registros nuevos.")
 else:
@@ -348,3 +348,5 @@ if not df_vis.empty:
         print("FT_Visitas: No hay cambios para cargar.")
 else:
     print("FT_Visitas: No hay datos nuevos para cargar.")
+
+

@@ -360,4 +360,3 @@ if not df_vis.empty:
 else:
     print("FT_Visitas: No hay datos nuevos para cargar.")
 
-

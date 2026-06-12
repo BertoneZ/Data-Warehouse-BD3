@@ -356,7 +356,7 @@ if not df_vis.empty:
         else: return 4
     df_vis['id_rango_etario'] = df_vis['edad'].apply(asignar_rango)
 
-    df_vis['id_tipo_visita'] = df_vis['id_publicacion'].apply(lambda x: 1 if pd.notna(x) else 2)
+    df_vis['id_tipo_visita'] = df_vis['id_publicacion'].apply(lambda x: 1 if pd.isna(x) else 2)
     df_vis['costo_visitas_pagadas'] = df_vis['costo_visitas_pagadas'].fillna(0)
     df_vis = df_vis.rename(columns={'id_sitio': 'id_sitioweb'})
 
@@ -364,7 +364,7 @@ if not df_vis.empty:
         'id_tiempo', 'id_tipo_visita', 'id_usuario', 'id_sitioweb',
         'id_ubicacion_usuario', 'id_emplazamiento', 'id_rango_etario',
         'id_ubicacion_cliente', 'id_cliente'
-    ]).agg(
+    ], dropna=False).agg(
         cantidad_visitas=('id_usuario', 'count'),
         costo_visitas_pagadas=('costo_visitas_pagadas', 'sum')
     ).reset_index()

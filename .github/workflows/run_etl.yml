@@ -1,0 +1,26 @@
+name: Ejecutar ETL Automático
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Traer el código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11' 
+
+      - name: Instalar librerías
+        run: pip install pandas sqlalchemy psycopg2-binary numpy python-dotenv
+
+      - name: Ejecutar script ETL
+        env: 
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python etl.py

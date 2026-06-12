@@ -150,10 +150,26 @@ if count_visitas == 0:
     })
     df_tipo_visita.to_sql('dim_tipo_visita', engine, schema='data_warehouse', if_exists='append', index=False)
     df_tipo_visita.to_csv('datos_exportados/dim_tipo_visita.csv', index=False)
-    print("Dim_TipoVisita: Cargada desde cero.")
+    print(f"Dim_TipoVisita: {len(df_tipo_visita)} registros cargados.")
 else:
     print("Dim_TipoVisita: No hay datos nuevos para cargar.")
+# -- DIMENSIÓN TIPO AVISO --
+try:
+    with engine.connect() as conn:
+        count_avisos = conn.execute(text("SELECT COUNT(*) FROM data_warehouse.dim_tipo_aviso;")).scalar()
+except Exception:
+    count_avisos = 0
 
+if count_avisos == 0:
+    df_tipo_aviso = pd.DataFrame({
+        'id_tipo_aviso': [1, 2, 3, 4, 5, 6],
+        'nombre_tipo': ['Banner', 'Pop-up', 'Video', 'Carrousel', 'Texto/Enlace Patrocinado', 'Anuncio Nativo']
+    })
+    df_tipo_aviso.to_sql('dim_tipo_aviso', engine, schema='data_warehouse', if_exists='append', index=False)
+    df_tipo_aviso.to_csv('datos_exportados/dim_tipo_aviso.csv', index=False)
+    print(f"Dim_TipoAviso: {len(df_tipo_aviso)} registros cargados.")
+else:
+    print("Dim_TipoAviso: No hay datos nuevos para cargar.")
 # -- DIMENSIÓN RANGO ETARIO --
 try:
     with engine.connect() as conn:

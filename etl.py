@@ -12,6 +12,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # Crea el motor directamente con la URL
 engine = create_engine(DATABASE_URL)
 
+CALENDARIO_INICIO = pd.Timestamp('2024-01-01').date()
+CALENDARIO_FIN = pd.Timestamp('2099-12-31').date()
+VENTANA_SOLAPE_DIAS = 1
+
 #DIMENSIÓN SITIO WEB
 # 1. Buscar el último ID en el DW
 query_max_sitio = text("SELECT COALESCE(MAX(id_sitio_web), 0) FROM data_warehouse.dim_sitio_web;")
@@ -191,38 +195,74 @@ else:
 # -- DIMENSIÓN TIEMPO --
 try:
     with engine.connect() as conn:
-        count_tiempo = conn.execute(text("SELECT COUNT(*) FROM data_warehouse.dim_tiempo;")).scalar()
+        ids_tiempo_existentes = {
+            fila[0]
+            for fila in conn.execute(text("SELECT id_tiempo FROM data_warehouse.dim_tiempo;"))
+        }
 except Exception:
-    count_tiempo = 0
+    ids_tiempo_existentes = set()
 
-if count_tiempo == 0:
-    # Generamos un calendario automático desde 2024 hasta 2026
-    fechas = pd.date_range(start='2024-01-01', end='2026-12-31')
+def crear_calendario(fecha_inicio, fecha_fin):
+    fechas = pd.date_range(start=fecha_inicio, end=fecha_fin)
     df_tiempo = pd.DataFrame({'fecha': fechas})
-    df_tiempo['id_tiempo'] = df_tiempo['fecha'].dt.strftime('%d%m%Y').astype(int) #le puse formato dia mes y año 
+    df_tiempo['id_tiempo'] = df_tiempo['fecha'].dt.strftime('%d%m%Y').astype(int)
     df_tiempo['dia'] = df_tiempo['fecha'].dt.day
     df_tiempo['mes'] = df_tiempo['fecha'].dt.month
     df_tiempo['anio'] = df_tiempo['fecha'].dt.year
-    
-    # Asignar estación del año simplificada
+
     def obtener_estacion(mes):
         if mes in [12, 1, 2]: return 'Verano'
         elif mes in [3, 4, 5]: return 'Otoño'
         elif mes in [6, 7, 8]: return 'Invierno'
         else: return 'Primavera'
-        
+
     df_tiempo['estacion'] = df_tiempo['mes'].apply(obtener_estacion)
-    
-    # Eliminar la columna fecha temporal
-    df_tiempo = df_tiempo.drop(columns=['fecha'])
-    
+    return df_tiempo.drop(columns=['fecha'])
+
+df_tiempo = crear_calendario(CALENDARIO_INICIO, CALENDARIO_FIN)
+df_tiempo = df_tiempo[~df_tiempo['id_tiempo'].isin(ids_tiempo_existentes)]
+
+if not df_tiempo.empty:
     df_tiempo.to_sql('dim_tiempo', engine, schema='data_warehouse', if_exists='append', index=False)
-    df_tiempo.to_csv('datos_exportados/dim_tiempo.csv', index=False)
-    print("Dim_Tiempo: Calendario generado y cargado.")
+    path_csv = 'datos_exportados/dim_tiempo.csv'
+    if os.path.exists(path_csv):
+        df_existente = pd.read_csv(path_csv)
+        df_final = pd.concat([df_existente, df_tiempo], ignore_index=True)
+    else:
+        df_final = df_tiempo
+    df_final.to_csv(path_csv, index=False)
+    print(f"Dim_Tiempo: Calendario cargado o extendido con {len(df_tiempo)} filas nuevas.")
 else:
     print("Dim_Tiempo: No hay datos nuevos para cargar.")
 
 #CARGA DE LAS FACT TABLES   
+def asegurar_tabla_control():
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS data_warehouse.etl_control (
+                proceso TEXT PRIMARY KEY,
+                ultima_fecha DATE NOT NULL
+            );
+        """))
+
+def obtener_ultima_fecha_procesada(proceso):
+    asegurar_tabla_control()
+    with engine.connect() as conn:
+        return conn.execute(
+            text("SELECT ultima_fecha FROM data_warehouse.etl_control WHERE proceso = :proceso;"),
+            {'proceso': proceso}
+        ).scalar()
+
+def guardar_ultima_fecha_procesada(proceso, ultima_fecha):
+    asegurar_tabla_control()
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO data_warehouse.etl_control (proceso, ultima_fecha)
+            VALUES (:proceso, :ultima_fecha)
+            ON CONFLICT (proceso) DO UPDATE
+            SET ultima_fecha = EXCLUDED.ultima_fecha;
+        """), {'proceso': proceso, 'ultima_fecha': ultima_fecha})
+
 def obtener_max_id_tiempo(nombre_tabla):
     try:
         with engine.connect() as conn:
@@ -248,7 +288,10 @@ def conjuntos_iguales(df_izquierda, df_derecha, columnas):
 
 max_ft_pub_tiempo = obtener_max_id_tiempo('ft_publicaciones')
 if max_ft_pub_tiempo:
-    fecha_corte_pub = pd.to_datetime(str(max_ft_pub_tiempo), format='%d%m%Y').date()
+    ultima_fecha_pub = obtener_ultima_fecha_procesada('ft_publicaciones')
+    with engine.connect() as conn:
+        max_fecha_fuente_pub = conn.execute(text("SELECT COALESCE(MAX(fecha), DATE '2024-01-01') FROM operacional.publicacion;")).scalar()
+    fecha_inicio_pub = CALENDARIO_INICIO if ultima_fecha_pub is None else max(CALENDARIO_INICIO, (pd.to_datetime(ultima_fecha_pub) - pd.Timedelta(days=VENTANA_SOLAPE_DIAS)).date())
     query_pub = text("""
 SELECT p.id_publicacion, p.fecha, p.id_emplazamiento, p.con_conversion_si_no,
        a.id_tipo_aviso, a.id_campania,
@@ -260,9 +303,9 @@ JOIN operacional.aviso a ON p.id_aviso = a.id_aviso
 JOIN operacional.campania c ON a.id_campania = c.id_campania
 JOIN operacional.cliente cli ON c.id_cliente = cli.id_cliente
 JOIN operacional.emplazamiento e ON p.id_emplazamiento = e.id_emplazamiento
-WHERE p.fecha >= :fecha_corte_pub;
+WHERE p.fecha >= :fecha_inicio_pub AND p.fecha <= :fecha_fin_pub;
 """)
-    df_pub = pd.read_sql(query_pub, engine, params={'fecha_corte_pub': fecha_corte_pub})
+    df_pub = pd.read_sql(query_pub, engine, params={'fecha_inicio_pub': fecha_inicio_pub, 'fecha_fin_pub': max_fecha_fuente_pub})
 else:
     query_pub = text("""
 SELECT p.id_publicacion, p.fecha, p.id_emplazamiento, p.con_conversion_si_no,
@@ -300,6 +343,7 @@ if not df_pub.empty:
 
         df_ft_pub.to_sql('ft_publicaciones', engine, schema='data_warehouse', if_exists='append', index=False)
         df_ft_pub.to_csv('datos_exportados/ft_publicaciones.csv', index=False)
+        guardar_ultima_fecha_procesada('ft_publicaciones', pd.to_datetime(max_fecha_fuente_pub).date())
         print(f"FT_Publicaciones: {len(df_ft_pub)} registros cargados o actualizados.")
     else:
         print("FT_Publicaciones: No hay cambios para cargar.")
@@ -309,7 +353,10 @@ else:
 #CARGA DE FT_VISITAS
 max_ft_vis_tiempo = obtener_max_id_tiempo('ft_visitas')
 if max_ft_vis_tiempo:
-    fecha_corte_vis = pd.to_datetime(str(max_ft_vis_tiempo), format='%d%m%Y').date()
+    ultima_fecha_vis = obtener_ultima_fecha_procesada('ft_visitas')
+    with engine.connect() as conn:
+        max_fecha_fuente_vis = conn.execute(text("SELECT COALESCE(MAX(fecha), DATE '2024-01-01') FROM operacional.visitas;")).scalar()
+    fecha_inicio_vis = CALENDARIO_INICIO if ultima_fecha_vis is None else max(CALENDARIO_INICIO, (pd.to_datetime(ultima_fecha_vis) - pd.Timedelta(days=VENTANA_SOLAPE_DIAS)).date())
     query_vis = text("""
 SELECT v.id_sitio, v.fecha, v.id_usuario, v.id_publicacion,
        u.fecha_nacimiento, u.id_localidad AS id_ubicacion_usuario,
@@ -323,9 +370,9 @@ JOIN operacional.sitio_web s ON v.id_sitio = s.id_sitio
 JOIN operacional.cliente cli ON s.id_cliente = cli.id_cliente
 LEFT JOIN operacional.publicacion p ON v.id_publicacion = p.id_publicacion
 LEFT JOIN operacional.emplazamiento e ON p.id_emplazamiento = e.id_emplazamiento
-WHERE v.fecha >= :fecha_corte_vis;
+WHERE v.fecha >= :fecha_inicio_vis AND v.fecha <= :fecha_fin_vis;
 """)
-    df_vis = pd.read_sql(query_vis, engine, params={'fecha_corte_vis': fecha_corte_vis})
+    df_vis = pd.read_sql(query_vis, engine, params={'fecha_inicio_vis': fecha_inicio_vis, 'fecha_fin_vis': max_fecha_fuente_vis})
 else:
     query_vis = text("""
 SELECT v.id_sitio, v.fecha, v.id_usuario, v.id_publicacion,
@@ -380,6 +427,7 @@ if not df_vis.empty:
 
         df_ft_vis.to_sql('ft_visitas', engine, schema='data_warehouse', if_exists='append', index=False)
         df_ft_vis.to_csv('datos_exportados/ft_visitas.csv', index=False)
+        guardar_ultima_fecha_procesada('ft_visitas', pd.to_datetime(max_fecha_fuente_vis).date())
         print(f"FT_Visitas: {len(df_ft_vis)} registros cargados o actualizados desde la base operativa.")
     else:
         print("FT_Visitas: No hay cambios para cargar.")

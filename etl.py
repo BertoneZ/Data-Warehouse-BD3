@@ -146,7 +146,7 @@ except Exception:
 if count_visitas == 0:
     df_tipo_visita = pd.DataFrame({
         'id_tipo_visita': [1, 2],
-        'tipo_visita': ['Orgánica', 'Pagada']
+       'tipo_visita': ['Pagada', 'Orgánica']
     })
     df_tipo_visita.to_sql('dim_tipo_visita', engine, schema='data_warehouse', if_exists='append', index=False)
     df_tipo_visita.to_csv('datos_exportados/dim_tipo_visita.csv', index=False)
@@ -340,7 +340,7 @@ if not df_vis.empty:
         else: return 4
     df_vis['id_rango_etario'] = df_vis['edad'].apply(asignar_rango)
 
-    df_vis['id_tipo_visita'] = df_vis['id_publicacion'].apply(lambda x: 1 if pd.isna(x) else 2)
+    df_vis['id_tipo_visita'] = df_vis['id_publicacion'].apply(lambda x: 1 if pd.notna(x) else 2)
     df_vis['costo_visitas_pagadas'] = df_vis['costo_visitas_pagadas'].fillna(0)
     df_vis = df_vis.rename(columns={'id_sitio': 'id_sitioweb'})
 

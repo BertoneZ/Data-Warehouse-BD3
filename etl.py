@@ -29,7 +29,17 @@ if not df_sitio_web.empty:
         'url_sitio': 'url_sitio_web'
     })
     df_sitio_web.to_sql('dim_sitio_web', engine, schema='data_warehouse', if_exists='append', index=False)
-    df_sitio_web.to_csv('datos_exportados/dim_sitio_web.csv', index=False)
+   # df_sitio_web.to_csv('datos_exportados/dim_sitio_web.csv', index=False)
+    path_csv = 'datos_exportados/dim_sitio_web.csv'
+    
+    if os.path.exists(path_csv):
+        df_existente = pd.read_csv(path_csv)
+        df_final = pd.concat([df_existente, df_sitio_web], ignore_index=True)
+    else:
+        df_final = df_sitio_web
+        
+    # 3. Guardar el acumulado total
+    df_final.to_csv(path_csv, index=False)
     print(f"Dim_Sitio_Web: {len(df_sitio_web)} sitios web nuevos.")
 else:
     print("Dim_Sitio_Web: No hay datos nuevos para cargar.")

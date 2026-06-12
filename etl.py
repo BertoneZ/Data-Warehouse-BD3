@@ -29,6 +29,7 @@ if not df_sitio_web.empty:
         'url_sitio': 'url_sitio_web'
     })
     df_sitio_web.to_sql('dim_sitio_web', engine, schema='data_warehouse', if_exists='append', index=False)
+    df_sitio_web.to_csv('datos_exportados/dim_sitio_web.csv', index=False)
     print(f"Dim_Sitio_Web: {len(df_sitio_web)} sitios web nuevos.")
 else:
     print("Dim_Sitio_Web: No hay datos nuevos para cargar.")
@@ -44,6 +45,7 @@ df_cliente = pd.read_sql(f"SELECT id_cliente, nombre FROM operacional.cliente WH
 if not df_cliente.empty:
     df_cliente = df_cliente.rename(columns={'nombre': 'nombre_cliente'})
     df_cliente.to_sql('dim_cliente', engine, schema='data_warehouse', if_exists='append', index=False)
+    df_cliente.to_csv('datos_exportados/dim_cliente.csv', index=False)
     print(f"Dim_Cliente: {len(df_cliente)} registros nuevos.")
 else:
     print("Dim_Cliente: No hay datos nuevos para cargar.")
@@ -59,6 +61,7 @@ df_campania = pd.read_sql(f"SELECT id_campania, nombre FROM operacional.campania
 if not df_campania.empty:
     df_campania = df_campania.rename(columns={'nombre': 'nombre_campania'})
     df_campania.to_sql('dim_campania', engine, schema='data_warehouse', if_exists='append', index=False)
+
     print(f"Dim_Campania: {len(df_campania)} registros nuevos.")
 else:
     print("Dim_Campania: No hay datos nuevos para cargar.")
@@ -74,6 +77,7 @@ df_emplazamiento = pd.read_sql(f"SELECT id_emplazamiento, url_emplazamiento FROM
 if not df_emplazamiento.empty:
    
     df_emplazamiento.to_sql('dim_emplazamiento', engine, schema='data_warehouse', if_exists='append', index=False)
+    df_emplazamiento.to_csv('datos_exportados/dim_emplazamiento.csv', index=False)
     print(f"Dim_Emplazamiento: {len(df_emplazamiento)} registros nuevos.")
 else:
     print("Dim_Emplazamiento: No hay datos nuevos para cargar.")
@@ -88,6 +92,7 @@ except Exception:
 df_usuario = pd.read_sql(f"SELECT id_usuario, sexo FROM operacional.usuario WHERE id_usuario > {max_id_usu};", engine)
 if not df_usuario.empty:
     df_usuario.to_sql('dim_usuario', engine, schema='data_warehouse', if_exists='append', index=False)
+    df_usuario.to_csv('datos_exportados/dim_usuario.csv', index=False)
     print(f"Dim_Usuario: {len(df_usuario)} registros nuevos.")
 else:
     print("Dim_Usuario: No hay datos nuevos para cargar.")
@@ -115,6 +120,7 @@ except Exception:
 df_ubi_nueva = df_ubi_final[df_ubi_final['id_ubicacion'] > max_id_ubi]
 if not df_ubi_nueva.empty:
     df_ubi_nueva.to_sql('dim_ubicaciones', engine, schema='data_warehouse', if_exists='append', index=False)
+    df_ubi_nueva.to_csv('datos_exportados/dim_ubicaciones.csv', index=False)
     print(f"Dim_Ubicaciones: {len(df_ubi_nueva)} registros nuevos.")
 else:
     print("Dim_Ubicaciones: No hay datos nuevos para cargar.")
@@ -133,6 +139,7 @@ if count_visitas == 0:
         'tipo_visita': ['Orgánica', 'Pagada']
     })
     df_tipo_visita.to_sql('dim_tipo_visita', engine, schema='data_warehouse', if_exists='append', index=False)
+    df_tipo_visita.to_csv('datos_exportados/dim_tipo_visita.csv', index=False)
     print("Dim_TipoVisita: Cargada desde cero.")
 else:
     print("Dim_TipoVisita: No hay datos nuevos para cargar.")
@@ -150,6 +157,7 @@ if count_rangos == 0:
         'rango_etario': ['0-20', '21-40', '41-60', '+60']
     })
     df_rango_etario.to_sql('dim_rango_etario', engine, schema='data_warehouse', if_exists='append', index=False)
+    df_rango_etario.to_csv('datos_exportados/dim_rango_etario.csv', index=False)
     print("Dim_RangoEtario: Cargada desde cero.")
 else:
     print("Dim_RangoEtario: No hay datos nuevos para cargar.")
@@ -183,6 +191,7 @@ if count_tiempo == 0:
     df_tiempo = df_tiempo.drop(columns=['fecha'])
     
     df_tiempo.to_sql('dim_tiempo', engine, schema='data_warehouse', if_exists='append', index=False)
+    df_tiempo.to_csv('datos_exportados/dim_tiempo.csv', index=False)
     print("Dim_Tiempo: Calendario generado y cargado.")
 else:
     print("Dim_Tiempo: No hay datos nuevos para cargar.")
@@ -264,6 +273,7 @@ if not df_pub.empty:
                 conn.execute(text(f"DELETE FROM data_warehouse.ft_publicaciones WHERE id_tiempo IN ({ids_pub});"))
 
         df_ft_pub.to_sql('ft_publicaciones', engine, schema='data_warehouse', if_exists='append', index=False)
+        df_ft_pub.to_csv('datos_exportados/ft_publicaciones.csv', index=False)
         print(f"FT_Publicaciones: {len(df_ft_pub)} registros cargados o actualizados.")
     else:
         print("FT_Publicaciones: No hay cambios para cargar.")
@@ -343,6 +353,7 @@ if not df_vis.empty:
                 conn.execute(text(f"DELETE FROM data_warehouse.ft_visitas WHERE id_tiempo IN ({ids_vis});"))
 
         df_ft_vis.to_sql('ft_visitas', engine, schema='data_warehouse', if_exists='append', index=False)
+        df_ft_vis.to_csv('datos_exportados/ft_visitas.csv', index=False)
         print(f"FT_Visitas: {len(df_ft_vis)} registros cargados o actualizados desde la base operativa.")
     else:
         print("FT_Visitas: No hay cambios para cargar.")

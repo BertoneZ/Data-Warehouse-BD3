@@ -12,6 +12,14 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # Crea el motor directamente con la URL
 engine = create_engine(DATABASE_URL)
 
+def exportar_csv_acumulado(df, path_csv):
+    if os.path.exists(path_csv):
+        df_existente = pd.read_csv(path_csv)
+        df_final = pd.concat([df_existente, df], ignore_index=True)
+    else:
+        df_final = df
+    df_final.to_csv(path_csv, index=False)
+
 CALENDARIO_INICIO = pd.Timestamp('2024-01-01').date()
 CALENDARIO_FIN = pd.Timestamp('2099-12-31').date()
 VENTANA_SOLAPE_DIAS = 1
@@ -33,17 +41,7 @@ if not df_sitio_web.empty:
         'url_sitio': 'url_sitio_web'
     })
     df_sitio_web.to_sql('dim_sitio_web', engine, schema='data_warehouse', if_exists='append', index=False)
-   # df_sitio_web.to_csv('datos_exportados/dim_sitio_web.csv', index=False)
-    path_csv = 'datos_exportados/dim_sitio_web.csv'
-    
-    if os.path.exists(path_csv):
-        df_existente = pd.read_csv(path_csv)
-        df_final = pd.concat([df_existente, df_sitio_web], ignore_index=True)
-    else:
-        df_final = df_sitio_web
-        
-    # 3. Guardar el acumulado total
-    df_final.to_csv(path_csv, index=False)
+    exportar_csv_acumulado(df_sitio_web, 'datos_exportados/dim_sitio_web.csv')
     print(f"Dim_Sitio_Web: {len(df_sitio_web)} sitios web nuevos.")
 else:
     print("Dim_Sitio_Web: No hay datos nuevos para cargar.")
@@ -59,7 +57,7 @@ df_cliente = pd.read_sql(f"SELECT id_cliente, nombre FROM operacional.cliente WH
 if not df_cliente.empty:
     df_cliente = df_cliente.rename(columns={'nombre': 'nombre_cliente'})
     df_cliente.to_sql('dim_cliente', engine, schema='data_warehouse', if_exists='append', index=False)
-    df_cliente.to_csv('datos_exportados/dim_cliente.csv', index=False)
+    exportar_csv_acumulado(df_cliente, 'datos_exportados/dim_cliente.csv')
     print(f"Dim_Cliente: {len(df_cliente)} registros nuevos.")
 else:
     print("Dim_Cliente: No hay datos nuevos para cargar.")
@@ -75,6 +73,7 @@ df_campania = pd.read_sql(f"SELECT id_campania, nombre FROM operacional.campania
 if not df_campania.empty:
     df_campania = df_campania.rename(columns={'nombre': 'nombre_campania'})
     df_campania.to_sql('dim_campania', engine, schema='data_warehouse', if_exists='append', index=False)
+    exportar_csv_acumulado(df_campania, 'datos_exportados/dim_campania.csv')
 
     print(f"Dim_Campania: {len(df_campania)} registros nuevos.")
 else:
@@ -91,7 +90,7 @@ df_emplazamiento = pd.read_sql(f"SELECT id_emplazamiento, url_emplazamiento FROM
 if not df_emplazamiento.empty:
    
     df_emplazamiento.to_sql('dim_emplazamiento', engine, schema='data_warehouse', if_exists='append', index=False)
-    df_emplazamiento.to_csv('datos_exportados/dim_emplazamiento.csv', index=False)
+    exportar_csv_acumulado(df_emplazamiento, 'datos_exportados/dim_emplazamiento.csv')
     print(f"Dim_Emplazamiento: {len(df_emplazamiento)} registros nuevos.")
 else:
     print("Dim_Emplazamiento: No hay datos nuevos para cargar.")
@@ -106,7 +105,7 @@ except Exception:
 df_usuario = pd.read_sql(f"SELECT id_usuario, sexo FROM operacional.usuario WHERE id_usuario > {max_id_usu};", engine)
 if not df_usuario.empty:
     df_usuario.to_sql('dim_usuario', engine, schema='data_warehouse', if_exists='append', index=False)
-    df_usuario.to_csv('datos_exportados/dim_usuario.csv', index=False)
+    exportar_csv_acumulado(df_usuario, 'datos_exportados/dim_usuario.csv')
     print(f"Dim_Usuario: {len(df_usuario)} registros nuevos.")
 else:
     print("Dim_Usuario: No hay datos nuevos para cargar.")
@@ -134,13 +133,13 @@ except Exception:
 df_ubi_nueva = df_ubi_final[df_ubi_final['id_ubicacion'] > max_id_ubi]
 if not df_ubi_nueva.empty:
     df_ubi_nueva.to_sql('dim_ubicaciones', engine, schema='data_warehouse', if_exists='append', index=False)
-    df_ubi_nueva.to_csv('datos_exportados/dim_ubicaciones.csv', index=False)
+    exportar_csv_acumulado(df_ubi_nueva, 'datos_exportados/dim_ubicaciones.csv')
     print(f"Dim_Ubicaciones: {len(df_ubi_nueva)} registros nuevos.")
 else:
     print("Dim_Ubicaciones: No hay datos nuevos para cargar.")
 
 # -- DIMENSIÓN TIPO VISITA -- 
-# Los visitantes llegan de forma orgánica o pagada 
+
 try:
     with engine.connect() as conn:
         count_visitas = conn.execute(text("SELECT COUNT(*) FROM data_warehouse.dim_tipo_visita;")).scalar()
@@ -153,7 +152,7 @@ if count_visitas == 0:
        'tipo_visita': ['Pagada', 'Orgánica']
     })
     df_tipo_visita.to_sql('dim_tipo_visita', engine, schema='data_warehouse', if_exists='append', index=False)
-    df_tipo_visita.to_csv('datos_exportados/dim_tipo_visita.csv', index=False)
+    exportar_csv_acumulado(df_tipo_visita, 'datos_exportados/dim_tipo_visita.csv')
     print(f"Dim_TipoVisita: {len(df_tipo_visita)} registros cargados.")
 else:
     print("Dim_TipoVisita: No hay datos nuevos para cargar.")
@@ -170,7 +169,7 @@ if count_avisos == 0:
         'nombre_tipo': ['Banner', 'Pop-up', 'Video', 'Carrousel', 'Texto/Enlace Patrocinado', 'Anuncio Nativo']
     })
     df_tipo_aviso.to_sql('dim_tipo_aviso', engine, schema='data_warehouse', if_exists='append', index=False)
-    df_tipo_aviso.to_csv('datos_exportados/dim_tipo_aviso.csv', index=False)
+    exportar_csv_acumulado(df_tipo_aviso, 'datos_exportados/dim_tipo_aviso.csv')
     print(f"Dim_TipoAviso: {len(df_tipo_aviso)} registros cargados.")
 else:
     print("Dim_TipoAviso: No hay datos nuevos para cargar.")
@@ -187,7 +186,7 @@ if count_rangos == 0:
         'rango_etario': ['0-20', '21-40', '41-60', '+60']
     })
     df_rango_etario.to_sql('dim_rango_etario', engine, schema='data_warehouse', if_exists='append', index=False)
-    df_rango_etario.to_csv('datos_exportados/dim_rango_etario.csv', index=False)
+    exportar_csv_acumulado(df_rango_etario, 'datos_exportados/dim_rango_etario.csv')
     print("Dim_RangoEtario: Cargada desde cero.")
 else:
     print("Dim_RangoEtario: No hay datos nuevos para cargar.")
@@ -224,13 +223,7 @@ df_tiempo = df_tiempo[~df_tiempo['id_tiempo'].isin(ids_tiempo_existentes)]
 
 if not df_tiempo.empty:
     df_tiempo.to_sql('dim_tiempo', engine, schema='data_warehouse', if_exists='append', index=False)
-    path_csv = 'datos_exportados/dim_tiempo.csv'
-    if os.path.exists(path_csv):
-        df_existente = pd.read_csv(path_csv)
-        df_final = pd.concat([df_existente, df_tiempo], ignore_index=True)
-    else:
-        df_final = df_tiempo
-    df_final.to_csv(path_csv, index=False)
+    exportar_csv_acumulado(df_tiempo, 'datos_exportados/dim_tiempo.csv')
     print(f"Dim_Tiempo: Calendario cargado o extendido con {len(df_tiempo)} filas nuevas.")
 else:
     print("Dim_Tiempo: No hay datos nuevos para cargar.")
@@ -349,7 +342,7 @@ if not df_pub.empty:
         print("FT_Publicaciones: No hay cambios para cargar.")
 else:
     print("FT_Publicaciones: No hay datos nuevos para cargar.")
-
+################################################
 #CARGA DE FT_VISITAS
 max_ft_vis_tiempo = obtener_max_id_tiempo('ft_visitas')
 if max_ft_vis_tiempo:

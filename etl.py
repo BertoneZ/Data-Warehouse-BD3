@@ -235,7 +235,7 @@ if not df_tiempo.empty:
 else:
     print("Dim_Tiempo: No hay datos nuevos para cargar.")
 
-#CARGA DE LAS FACT TABLES   
+#ACA CARGO LA FACT PUBLICACIONES   
 def asegurar_tabla_control():
     with engine.begin() as conn:
         conn.execute(text("""
